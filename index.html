@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>战斗意图抽取 · CoC 模组测试桌</title>
+<style>
+/* SECTION: base */
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#0d0c0a; --bg2:#161310; --panel:#1d1815; --panel2:#241e19;
+  --line:#3a3128; --line2:#4d4136;
+  --ink:#e9dfc8; --ink-dim:#a89a80; --ink-faint:#7a6f5d;
+  --gold:#c9a227; --gold-soft:#e3c766;
+  --knight:#7f9fbf; --archer:#6fa876; --mage:#a17fc4; --priest:#e0b968;
+  --danger:#b5543c;
+  --radius:14px;
+}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+  font-family:"Songti SC","Noto Serif CJK SC","Source Han Serif SC",Georgia,"PingFang SC","Microsoft YaHei",serif;
+  -webkit-text-size-adjust:100%}
+body{min-height:100vh;
+  background:
+    radial-gradient(1100px 600px at 15% -10%,rgba(201,162,39,.10),transparent 60%),
+    radial-gradient(900px 500px at 110% 20%,rgba(127,159,191,.08),transparent 60%),
+    var(--bg)}
+button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:none}
+.wrap{max-width:1060px;margin:0 auto;padding:clamp(12px,3vw,26px)}
+
+/* SECTION: header */
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-bottom:14px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0;flex:1 1 auto}
+.brand h1{font-size:clamp(17px,3.6vw,23px);margin:0;letter-spacing:.06em;color:var(--gold-soft);font-weight:600}
+.brand small{color:var(--ink-faint);font-size:12px;letter-spacing:.12em;white-space:nowrap}
+.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* SECTION: buttons */
+.btn{border:1px solid var(--line2);background:linear-gradient(180deg,var(--panel2),var(--panel));
+  color:var(--ink);padding:10px 16px;border-radius:10px;font-size:14px;letter-spacing:.04em;
+  min-height:44px;transition:border-color .18s,transform .12s,box-shadow .18s}
+.btn:hover{border-color:var(--gold)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:linear-gradient(180deg,#8a6f1c,#6b5514);border-color:#b9982f;color:#fff4d6;
+  font-weight:600;box-shadow:0 4px 18px rgba(201,162,39,.22)}
+.btn.primary:hover{box-shadow:0 6px 24px rgba(201,162,39,.34)}
+.btn.ghost{background:transparent}
+.btn.gold{border-color:var(--gold);color:var(--gold-soft)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn.big{padding:14px 26px;font-size:16px;width:100%}
+
+/* SECTION: class select */
+.hero{text-align:center;padding:clamp(14px,4vw,34px) 0 clamp(16px,4vw,30px)}
+.hero .rune{font-size:12px;letter-spacing:.5em;color:var(--ink-faint);text-transform:uppercase}
+.hero h2{margin:.5em 0 .4em;font-size:clamp(24px,6vw,40px);color:var(--gold-soft);font-weight:600;letter-spacing:.04em}
+.hero p{margin:0 auto;max-width:620px;color:var(--ink-dim);font-size:clamp(13px,2.6vw,15px);line-height:1.85}
+.ruleflow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:20px}
+.ruleflow span{border:1px solid var(--line);border-radius:999px;padding:7px 15px;font-size:12.5px;color:var(--ink-faint);background:rgba(255,255,255,.02)}
+.classgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:26px}
+.classcard{position:relative;text-align:left;border:1px solid var(--line);border-radius:var(--radius);
+  background:linear-gradient(165deg,rgba(255,255,255,.045),rgba(0,0,0,.22)),var(--panel);
+  padding:20px 18px 18px;min-height:150px;overflow:hidden;transition:transform .18s,border-color .18s,box-shadow .18s}
+.classcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.classcard::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;
+  background:var(--accent);opacity:.10;filter:blur(6px)}
+.classcard:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 12px 30px rgba(0,0,0,.45)}
+.classcard .glyph{font-size:26px;line-height:1;color:var(--accent)}
+.classcard .cname{font-size:20px;margin:12px 0 4px;color:var(--ink);letter-spacing:.08em}
+.classcard .cen{font-size:11px;letter-spacing:.22em;color:var(--ink-faint);text-transform:uppercase}
+.classcard .cq{margin-top:12px;font-size:12.5px;color:var(--ink-dim);line-height:1.7}
+
+/* SECTION: battle */
+.hidden{display:none!important}
+.ident{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;background:var(--panel);margin-bottom:16px}
+.ident .badge{width:40px;height:40px;flex:0 0 auto;border-radius:10px;display:grid;place-items:center;
+  font-size:20px;background:rgba(255,255,255,.05);border:1px solid var(--accent);color:var(--accent)}
+.ident .who{min-width:0;flex:1 1 180px}
+.ident .who b{display:block;font-size:16px;letter-spacing:.06em}
+.ident .who i{display:block;font-style:normal;font-size:12px;color:var(--ink-faint);margin-top:3px}
+.round{border:1px solid var(--line2);border-radius:10px;padding:6px 14px;text-align:center;background:rgba(0,0,0,.25)}
+.round b{display:block;font-size:19px;color:var(--gold-soft);line-height:1.2}
+.round i{font-style:normal;font-size:10.5px;letter-spacing:.2em;color:var(--ink-faint)}
+
+.panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:clamp(14px,3vw,22px);margin-bottom:16px}
+.panel h3{margin:0 0 4px;font-size:15px;letter-spacing:.1em;color:var(--gold-soft);font-weight:600}
+.panel .hint{margin:0 0 16px;font-size:12.5px;color:var(--ink-faint);line-height:1.7}
+
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.slot{position:relative;text-align:left;border:1px solid var(--line);border-radius:12px;padding:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.16));min-height:186px;
+  display:flex;flex-direction:column;gap:8px;transition:border-color .16s,transform .16s,background .16s;
+  min-width:0}
+.slot.empty{align-items:center;justify-content:center;color:var(--ink-faint);font-size:13px;letter-spacing:.14em;
+  border-style:dashed;background:rgba(0,0,0,.14);min-height:186px}
+.slot.pickable{cursor:pointer}
+.slot.pickable:hover{border-color:var(--line2);transform:translateY(-2px)}
+.slot.on{border-color:var(--gold);background:linear-gradient(180deg,rgba(201,162,39,.14),rgba(0,0,0,.1));
+  box-shadow:0 0 0 1px rgba(201,162,39,.25),0 8px 26px rgba(0,0,0,.4)}
+.slot.on::after{content:"✓ 已选";position:absolute;top:10px;right:10px;font-size:11px;color:#0d0c0a;
+  background:var(--gold);padding:2px 8px;border-radius:999px;letter-spacing:.06em}
+.slot .src{display:inline-flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;
+  color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:2px 9px;align-self:flex-start}
+.slot .row1{display:flex;align-items:center;gap:12px;min-width:0}
+.iname{font-size:19px;letter-spacing:.05em;color:var(--ink);font-weight:600;min-width:0}
+.idesc{font-size:12.5px;color:var(--ink-dim);line-height:1.6}
+.kv{display:flex;gap:8px;font-size:12px;line-height:1.65;align-items:flex-start}
+.kv b{flex:0 0 auto;color:var(--ink-faint);font-weight:400;letter-spacing:.08em;font-size:11px;
+  border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-top:1px}
+.kv span{color:var(--ink);min-width:0}
+.kv .eff{color:#d9c899}
+.slot .note{font-size:11.5px;color:var(--ink-faint);line-height:1.6;border-top:1px dashed var(--line);padding-top:7px;margin-top:auto}
+.slot.rolling .iname,.slot.rolling .idesc,.slot.rolling .kv,.slot.rolling .note{opacity:.25}
+
+/* dice */
+.die{width:44px;height:44px;flex:0 0 auto;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);
+  border:1px solid var(--line2);border-radius:9px;background:rgba(0,0,0,.34);padding:4px}
+.die i{width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:0;place-self:center;
+  box-shadow:0 0 6px rgba(227,199,102,.35)}
+.die[data-face="1"] i:nth-child(5){opacity:1}
+.die[data-face="2"] i:nth-child(1),.die[data-face="2"] i:nth-child(9){opacity:1}
+.die[data-face="3"] i:nth-child(1),.die[data-face="3"] i:nth-child(5),.die[data-face="3"] i:nth-child(9){opacity:1}
+.die[data-face="4"] i:nth-child(1),.die[data-face="4"] i:nth-child(3),.die[data-face="4"] i:nth-child(7),.die[data-face="4"] i:nth-child(9){opacity:1}
+.die[data-face="5"] i:nth-child(1),.die[data-face="5"] i:nth-child(3),.die[data-face="5"] i:nth-child(5),.die[data-face="5"] i:nth-child(7),.die[data-face="5"] i:nth-child(9){opacity:1}
+.die[data-face="6"] i:nth-child(1),.die[data-face="6"] i:nth-child(3),.die[data-face-6] i:nth-child(4){opacity:1}
+.die[data-face="6"] i:nth-child(4),.die[data-face="6"] i:nth-child(6),.die[data-face="6"] i:nth-child(7),.die[data-face="6"] i:nth-child(9){opacity:1}
+.die.shake{animation:shake .5s ease}
+@keyframes shake{0%,100%{transform:none}20%{transform:rotate(-14deg) translateY(-3px)}
+  45%{transform:rotate(11deg)}70%{transform:rotate(-7deg) translateY(2px)}}
+
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.actions .btn{flex:1 1 150px}
+.count{font-size:12.5px;color:var(--ink-faint);letter-spacing:.06em;margin-top:12px;text-align:center}
+.count em{font-style:normal;color:var(--gold-soft)}
+
+/* SECTION: result */
+.result{border:1px solid var(--gold);border-radius:var(--radius);padding:clamp(14px,3vw,22px);
+  background:linear-gradient(180deg,rgba(201,162,39,.11),rgba(0,0,0,.2))}
+.result h3{margin:0 0 3px;font-size:15px;color:var(--gold-soft);letter-spacing:.1em}
+.result .sub{font-size:12.5px;color:var(--ink-faint);margin:0 0 15px}
+.chosen{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.chip{border:1px solid var(--line2);border-radius:12px;padding:14px;background:rgba(0,0,0,.28);min-width:0}
+.chip .top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.chip .no{font-size:11px;color:var(--ink-faint);letter-spacing:.18em}
+.chip .n{font-size:18px;color:var(--gold-soft);font-weight:600;letter-spacing:.05em}
+.chip .t{font-size:11px;letter-spacing:.12em;color:var(--accent);margin-left:auto}
+.chip p{margin:5px 0;font-size:12.5px;line-height:1.65}
+.chip p .lb{color:var(--ink-faint)}
+.chip p .vl{color:var(--ink)}
+.chip p .ve{color:#d9c899}
+.chip .comb{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line2);font-size:12px;color:#cbb87e;line-height:1.7}
+.result .none{font-size:13px;color:var(--ink-faint);text-align:center;padding:20px 0}
+
+/* SECTION: log */
+.log{margin-top:6px}
+.log .item{display:flex;gap:10px;align-items:baseline;padding:9px 0;border-top:1px dashed var(--line);font-size:13px;flex-wrap:wrap}
+.log .item:first-child{border-top:none}
+.log .r{color:var(--ink-faint);flex:0 0 auto;font-size:11.5px;letter-spacing:.1em}
+.log .v{color:var(--ink)}
+.log .a{color:var(--gold-soft)}
+.log .empty{font-size:12.5px;color:var(--ink-faint)}
+
+/* SECTION: modal */
+.mask{position:fixed;inset:0;background:rgba(6,5,4,.8);backdrop-filter:blur(4px);display:none;
+  align-items:flex-start;justify-content:center;padding:clamp(14px,4vw,44px);overflow-y:auto;z-index:40}
+.mask.show{display:flex}
+.modal{width:100%;max-width:520px;border:1px solid var(--line2);border-radius:16px;background:var(--bg2);
+  padding:clamp(18px,3.4vw,26px);box-shadow:0 24px 70px rgba(0,0,0,.65)}
+.modal .mhead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.modal h4{margin:0;font-size:18px;color:var(--gold-soft);letter-spacing:.08em;flex:1;min-width:0}
+.modal .x{width:36px;height:36px;border-radius:9px;border:1px solid var(--line);color:var(--ink-dim);font-size:17px;flex:0 0 auto}
+.modal .x:hover{border-color:var(--danger);color:#e5a08c}
+.modal .msub{font-size:12.5px;color:var(--ink-faint);line-height:1.7;margin:0 0 18px}
+.packs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:11px}
+.pack{border:1px solid var(--line);border-radius:12px;padding:15px 14px;text-align:left;background:var(--panel);
+  transition:border-color .16s,transform .16s;min-width:0}
+.pack:hover{border-color:var(--gold);transform:translateY(-3px)}
+.pack.best{border-color:var(--gold);background:linear-gradient(180deg,rgba(201,162,39,.14),var(--panel))}
+.pack .amt{font-size:21px;color:var(--gold-soft);font-weight:600}
+.pack .bonus{font-size:11.5px;color:var(--archer);margin-top:3px}
+.pack .price{font-size:13px;color:var(--ink-dim);margin-top:10px}
+.pay{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.pay .btn{flex:1 1 110px;font-size:13px;padding:10px}
+.notice{margin-top:16px;font-size:11.5px;color:var(--ink-faint);line-height:1.75;border-top:1px dashed var(--line);padding-top:12px}
+
+/* SECTION: table viewer */
+.tv{width:100%;border-collapse:collapse;font-size:12.5px}
+.tv th,.tv td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top;line-height:1.6}
+.tv th{background:rgba(255,255,255,.05);color:var(--gold-soft);font-weight:600;letter-spacing:.06em}
+.tv td.p{color:var(--gold-soft);width:44px;text-align:center}
+.tv td.n{color:var(--ink);font-weight:600;width:84px;white-space:nowrap}
+.tvwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;padding:2px;margin-bottom:14px}
+.tvcap{font-size:12.5px;color:var(--accent);letter-spacing:.1em;margin:0 0 8px}
+
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(16px);opacity:0;
+  background:rgba(29,24,21,.97);border:1px solid var(--gold);color:var(--ink);padding:11px 20px;border-radius:10px;
+  font-size:13px;transition:opacity .22s,transform .22s;z-index:60;max-width:88vw;text-align:center;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{padding:26px 0 12px;text-align:center;font-size:11.5px;color:var(--ink-faint);letter-spacing:.1em;line-height:1.9}
+@media (max-width:520px){
+  .brand small{display:none}
+  .slot{min-height:0}
+  .slot.empty{min-height:150px}
+}
+</style>
+</head>
+<body>
+
+<!-- SECTION: header -->
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <h1>战斗意图抽取</h1>
+      <small>COC MODULE · TEST TABLE</small>
+    </div>
+    <div class="top-actions">
+      <button class="btn ghost" id="btnTable">意图总表</button>
+      <button class="btn ghost" id="btnSwitch">切换职业</button>
+      <button class="btn gold" id="btnRecharge">充值</button>
+    </div>
+  </div>
+
+  <!-- SECTION: class select screen -->
+  <section id="screenSelect">
+    <div class="hero">
+      <div class="rune">Choose Your Vocation</div>
+      <h2>选择你的职业</h2>
+      <p>每回合从<b>专职意图表</b>与<b>通用意图表</b>中各投两枚 d6，共得四条意图（点数可重复）；<br>再从四条中选定两条，作为本回合的行动意图。</p>
+      <div class="ruleflow">
+        <span>① 选职业</span><span>② 投 4 骰</span><span>③ 四选二</span><span>④ 确认并结算</span>
+      </div>
+    </div>
+    <div class="classgrid" id="classGrid"></div>
+  </section>
+
+  <!-- SECTION: battle screen -->
+  <section id="screenBattle" class="hidden">
+    <div class="ident" id="ident">
+      <div class="badge" id="idBadge">⚔</div>
+      <div class="who"><b id="idName">骑士</b><i id="idQuote">拉伤害的人</i></div>
+      <div class="round"><b id="roundNo">1</b><i>ROUND</i></div>
+    </div>
+
+    <div class="panel">
+      <h3>本回合意图抽取</h3>
+      <p class="hint">四条候选意图：<em style="font-style:normal;color:var(--accent)" id="hintClass">专职 ×2</em> + 通用 ×2。点击下方卡片选取，<b style="color:var(--gold-soft)">最多两条</b>。</p>
+      <div class="slots" id="slots"></div>
+      <div class="actions">
+        <button class="btn primary" id="btnRoll">投掷意图骰</button>
+        <button class="btn" id="btnReroll" disabled>重新抽取</button>
+        <button class="btn" id="btnLock" disabled>确认本回合意图</button>
+      </div>
+      <div class="count" id="countLine">尚未抽取</div>
+    </div>
+
+    <div class="panel result hidden" id="resultBox">
+      <h3>本回合行动意图</h3>
+      <p class="sub" id="resultSub">回合 1 · 已锁定</p>
+      <div class="chosen" id="chosen"></div>
+      <div class="actions">
+        <button class="btn primary" id="btnNext">进入下一回合</button>
+        <button class="btn ghost" id="btnAdjust">返回修改</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>本局意图记录</h3>
+      <p class="hint">KP 可用于核对测试桌各回合的行动分布。</p>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+
+  <footer>模组测试桌专用 · 单文件本地页面 · 掷骰结果由浏览器本地随机数生成</footer>
+</div>
+
+<!-- SECTION: recharge modal -->
+<div class="mask" id="maskRecharge">
+  <div class="modal">
+    <div class="mhead"><h4>积分充值</h4><button class="x" data-close="maskRecharge">✕</button></div>
+    <p class="msub">充值积分可用于解锁本模组的扩展意图包、多玩家联动视图等高级功能。</p>
+    <div class="packs" id="packs"></div>
+    <div class="pay">
+      <button class="btn" data-pay="微信支付">微信支付</button>
+      <button class="btn" data-pay="支付宝">支付宝</button>
+      <button class="btn" data-pay="Apple Pay">Apple Pay</button>
+    </div>
+    <p class="notice">本页面为带团辅助的离线演示页面，未接入任何真实支付通道，点击档位与支付方式仅作界面预览，不会扣除任何费用。实际充值请前往千问 App 内的账户页面完成。</p>
+  </div>
+</div>
+
+<!-- SECTION: table modal -->
+<div class="mask" id="maskTable">
+  <div class="modal" style="max-width:760px">
+    <div class="mhead"><h4 id="tvTitle">意图总表</h4><button class="x" data-close="maskTable">✕</button></div>
+    <p class="msub">点数即 d6 结果，与抽取逻辑完全一致。</p>
+    <div id="tvBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- SECTION: slot template -->
+<template id="tplSlot">
+  <div class="slot">
+    <span class="src"><span class="die-holder"></span><span class="srctxt"></span></span>
+    <div class="row1">
+      <div class="die"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="iname"></div>
+    </div>
+    <div class="idesc"></div>
+    <div class="kv check"><b>判定</b><span class="cv"></span></div>
+    <div class="kv effect"><b>效果</b><span class="eff"></span></div>
+    <div class="note"></div>
+  </div>
+</template>
+
+<template id="tplSlotEmpty">
+  <div class="slot empty">待投掷</div>
+</template>
+
+<template id="tplChip">
+  <div class="chip">
+    <div class="top"><span class="no"></span><span class="n"></span><span class="t"></span></div>
+    <p class="d"><span class="lb">描述 · </span><span class="vd"></span></p>
+    <p class="c"><span class="lb">判定 · </span><span class="vc"></span></p>
+    <p class="e"><span class="lb">效果 · </span><span class="ve2"></span></p>
+    <p class="comb"></p>
+  </div>
+</template>
+
+<script>
+/* SECTION: data —— 来自《战斗意图表.xlsx》，点数 1–6 对应 d6 */
+const COMMON = [
+  {p:1,name:"打击",desc:"使用武器对单攻击",check:"取决于武器",effect:"对单伤害",note:""},
+  {p:2,name:"防御",desc:"预备躲避敌方攻击",check:"闪避",effect:"成功等级＞敌方攻击则可闪避伤害",note:""},
+  {p:3,name:"群攻",desc:"使用武器对群攻击",check:"取决于武器",effect:"单体伤害为对单伤害÷敌方人数",note:"例：对面2个人，斗殴1d4=4，那么对每个人造成2点伤害"},
+  {p:4,name:"移动",desc:"靠近敌方",check:"敏捷",effect:"下一回合伤害翻倍",note:""},
+  {p:5,name:"隐匿",desc:"找个好地方藏起来",check:"敏捷",effect:"下一回合受到伤害减半",note:""},
+  {p:6,name:"洞悉",desc:"观察敌方战斗行为和弱点",check:"侦查",effect:"当前回合所有判定补正+10",note:""}
+];
+
+const CLASSES = {
+  knight:{key:"knight",name:"骑士",en:"KNIGHT",glyph:"⚔",accent:"var(--knight)",quote:"队伍的前排与节奏掌控者",
+    list:[
+      {p:1,name:"横扫",desc:"旋风斩（划掉）",check:"剑",effect:"对所有敌人造成1d5点伤害1/2/3次",note:"普通/困难/极难大成功"},
+      {p:2,name:"嘲讽",desc:"拉伤害",check:"敏捷",effect:"使自身受到伤害翻倍、队友减半",note:"不可和隐匿叠加"},
+      {p:3,name:"穿甲",desc:"刺穿敌人防御",check:"剑",effect:"使敌方下一次受到的伤害翻倍",note:"和移动的区别是这个可以队友吃"},
+      {p:4,name:"打断",desc:"中断敌方攻击",check:"剑",effect:"强制改变敌方意图",note:""},
+      {p:5,name:"狂暴",desc:"强化自身极限",check:"力量",effect:"hp-1，使下次伤害额外+1d4",note:""},
+      {p:6,name:"中伤",desc:"攻击敌方命脉",check:"剑",effect:"必须使用过【洞悉】，造成一次最大伤害",note:"白值最大"}
+    ]},
+  archer:{key:"archer",name:"弓箭手",en:"ARCHER",glyph:"➹",accent:"var(--archer)",quote:"距离即筹码，标记即杀意",
+    list:[
+      {p:1,name:"连射",desc:"射很多箭",check:"弓",effect:"造成三次伤害",note:"原表标注：.rap3#弓"},
+      {p:2,name:"弱点标记",desc:"易伤",check:"弓",effect:"标记1个单位使本回合所有人对其伤害+1/2/3",note:"普通/困难/极难大成功"},
+      {p:3,name:"箭雨",desc:"cost+12（划掉）",check:"弓",effect:"对所有敌人造成敌人数量+1伤害",note:""},
+      {p:4,name:"瞄准",desc:"在蓄力啦",check:"侦查",effect:"使下次“弓”判定值+20",note:"可和洞悉叠加"},
+      {p:5,name:"导向平箭",desc:"我没有学机械设计",check:"敏捷",effect:"本回合内敌方无法闪避",note:""},
+      {p:6,name:"暗箭",desc:"偷偷藏起来我射死你呀",check:"弓",effect:"必须使用过【隐匿】，造成一次最大伤害",note:""}
+    ]},
+  mage:{key:"mage",name:"魔法师",en:"MAGE",glyph:"✶",accent:"var(--mage)",quote:"使用魔法的前提是你会魔法",
+    list:[
+      {p:1,name:"火球术",desc:"扔一个火球",check:"射击",effect:"mp-1，造成1d[mp上限]的伤害",note:""},
+      {p:2,name:"虚弱",desc:"给对面上debuff",check:"射击",effect:"mp-1d3，使敌方本回合伤害-相同数值",note:""},
+      {p:3,name:"冰冻",desc:"寒檀二技能王昭君大招",check:"射击",effect:"mp-1d3，使敌方本回合所有判定-10",note:""},
+      {p:4,name:"下药",desc:"装糖阴你一手",check:"敏捷",effect:"使用任一魔药效果",note:""},
+      {p:5,name:"火焰附加",desc:"给队友附魔火焰附加",check:"无",effect:"mp-1d3，使1/2/3名队友下次攻击附着1d3的持续伤害2回合",note:""},
+      {p:6,name:"爆裂黎明",desc:"boom！",check:"射击",effect:"mp-3，必须使用过【移动】，造成一次最大伤害",note:""}
+    ]},
+  priest:{key:"priest",name:"牧师",en:"PRIEST",glyph:"☩",accent:"var(--priest)",quote:"学医救不了队友，但能拖延时间",
+    list:[
+      {p:1,name:"治疗术",desc:"单体奶人",check:"医学",effect:"mp-1，使一名队友hp+1d3",note:""},
+      {p:2,name:"净化",desc:"MC牛奶桶",check:"医学",effect:"mp-1，清除一名队友所有debuff",note:""},
+      {p:3,name:"增益",desc:"给友方上buff",check:"医学",effect:"mp-1，使一名队员指定技能判定+10",note:"可与任何叠加"},
+      {p:4,name:"群奶",desc:"群体奶人",check:"医学",effect:"mp-1使所有队友hp+1 或 mp-3使所有队友hp+1d3",note:""},
+      {p:5,name:"盾",desc:"给人上盾",check:"医学",effect:"mp-1，使一名队友本回合获得临时hp+1d6",note:"相当于1d6点临时生命，回合结束消失"},
+      {p:6,name:"物理超度",desc:"学医救不了队友",check:"攻击技能",effect:"必须使用过【防御】，造成一次携带武器最大伤害",note:""}
+    ]}
+};
+
+/* SECTION: state */
+const state = { cls:null, round:1, draw:null, picked:[], locked:false, log:[] };
+const $ = (id)=>document.getElementById(id);
+const MAX_PICK = 2;
+
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toast._h); toast._h=setTimeout(()=>t.classList.remove("show"),2100);
+}
+function d6(){ return 1+Math.floor(Math.random()*6); }
+
+/* SECTION: class select render */
+function renderClassCards(){
+  const grid=$("classGrid"); grid.textContent="";
+  Object.values(CLASSES).forEach(c=>{
+    const b=document.createElement("button");
+    b.className="classcard"; b.type="button"; b.dataset.key=c.key;
+    b.addEventListener("click",()=>enterClass(c.key));
+    const g=document.createElement("div"); g.className="glyph"; g.textContent=c.glyph;
+    const n=document.createElement("div"); n.className="cname"; n.textContent=c.name;
+    const e=document.createElement("div"); e.className="cen"; e.textContent=c.en;
+    const q=document.createElement("div"); q.className="cq"; q.textContent=c.quote;
+    b.append(g,n,e,q);
+    b.style.setProperty("--accent",c.accent);
+    grid.appendChild(b);
+  });
+}
+
+function enterClass(key){
+  state.cls=key; state.round=1; state.draw=null; state.picked=[]; state.locked=false; state.log=[];
+  const c=CLASSES[key];
+  $("screenSelect").classList.add("hidden");
+  $("screenBattle").classList.remove("hidden");
+  $("ident").style.setProperty("--accent",c.accent);
+  $("idBadge").textContent=c.glyph;
+  $("idName").textContent=c.name;
+  $("idQuote").textContent=c.quote;
+  $("hintClass").style.setProperty("--accent",c.accent);
+  $("resultBox").classList.add("hidden");
+  $("roundNo").textContent="1";
+  $("btnRoll").textContent="投掷意图骰";
+  renderSlots(); renderCount(); renderLog();
+  try{ localStorage.setItem("coc_intent_class",key); }catch(e){}
+}
+
+function backToSelect(){
+  $("screenBattle").classList.add("hidden");
+  $("screenSelect").classList.remove("hidden");
+  $("maskTable").classList.remove("show");
+}
+
+/* SECTION: draw logic —— 专职×2 + 通用×2，点数可重复 */
+function makeDraw(){
+  const cls=CLASSES[state.cls].list, out=[];
+  for(let i=0;i<2;i++){ const f=d6(); out.push({kind:"专职",face:f,item:cls[f-1]}); }
+  for(let i=0;i<2;i++){ const f=d6(); out.push({kind:"通用",face:f,item:COMMON[f-1]}); }
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=out[i]; out[i]=out[j]; out[j]=t; }
+  return out;
+}
+
+/* SECTION: slots render */
+function renderSlots(){
+  const box=$("slots"); box.textContent="";
+  if(!state.draw){
+    for(let i=0;i<4;i++) box.appendChild($("tplSlotEmpty").content.firstElementChild.cloneNode(true));
+    $("btnReroll").disabled=true; $("btnLock").disabled=true;
+    return;
+  }
+  const accent=CLASSES[state.cls].accent;
+  state.draw.forEach((d,i)=>{
+    const el=$("tplSlot").content.firstElementChild.cloneNode(true);
+    el.style.setProperty("--accent", d.kind==="专职" ? accent : "var(--gold-soft)");
+    el.classList.add("pickable");
+    if(state.picked.includes(i)) el.classList.add("on");
+    el.querySelector(".srctxt").textContent=d.kind+"意图表";
+    el.querySelector(".die").dataset.face=d.face;
+    el.querySelector(".iname").textContent=d.item.name;
+    el.querySelector(".idesc").textContent=d.item.desc;
+    el.querySelector(".cv").textContent=d.item.check;
+    el.querySelector(".eff").textContent=d.item.effect;
+    const note=el.querySelector(".note");
+    if(d.item.note){ note.textContent="备注 · "+d.item.note; } else { note.remove(); }
+    el.addEventListener("click",()=>togglePick(i));
+    box.appendChild(el);
+  });
+}
+
+function togglePick(i){
+  if(state.locked){ toast("本回合已锁定，可点“返回修改”"); return; }
+  const at=state.picked.indexOf(i);
+  if(at>=0){ state.picked.splice(at,1); }
+  else{
+    if(state.picked.length>=MAX_PICK){ toast("每条意图只能选两条，请先取消一条"); return; }
+    state.picked.push(i);
+  }
+  renderSlots(); renderCount(); syncBtns();
+}
+
+function renderCount(){
+  const el=$("countLine");
+  if(!state.draw){ el.textContent="尚未抽取"; return; }
+  if(state.locked){ el.textContent="回合 "+state.round+" 已锁定 · 进入下一回合继续"; return; }
+  el.textContent="已选择 ";
+  const em=document.createElement("em"); em.textContent=state.picked.length+" / "+MAX_PICK; el.appendChild(em);
+  const rest=document.createElement("span"); rest.textContent=" 条意图"; el.appendChild(rest);
+}
+
+function syncBtns(){
+  const has=!!state.draw;
+  $("btnReroll").disabled=!has||state.locked;
+  $("btnLock").disabled=!has||state.locked||state.picked.length!==MAX_PICK;
+  $("btnLock").textContent=state.locked?"已锁定":"确认本回合意图";
+  $("btnRoll").disabled=state.locked;
+}
+
+/* SECTION: roll with dice animation */
+let rolling=false;
+function roll(){
+  if(rolling) return; rolling=true;
+  state.draw=null; state.picked=[]; state.locked=false;
+  $("resultBox").classList.add("hidden");
+  renderSlots(); renderCount();
+  const draft=makeDraw();
+  const box=$("slots"); box.textContent="";
+  const accent=CLASSES[state.cls].accent;
+  const faces=[];
+  draft.forEach((d,i)=>{
+    const el=$("tplSlot").content.firstElementChild.cloneNode(true);
+    el.style.setProperty("--accent", d.kind==="专职" ? accent : "var(--gold-soft)");
+    el.classList.add("rolling");
+    el.querySelector(".srctxt").textContent=d.kind+"意图表";
+    el.querySelector(".iname").textContent="···";
+    el.querySelector(".idesc").textContent="骰子滚动中";
+    el.querySelector(".cv").textContent="—";
+    el.querySelector(".eff").textContent="—";
+    el.querySelector(".note").remove();
+    const die=el.querySelector(".die");
+    faces.push(die);
+    box.appendChild(el);
+  });
+  let tick=0;
+  const spin=setInterval(()=>{
+    tick++;
+    faces.forEach(f=>{ f.classList.remove("shake"); void f.offsetWidth; f.dataset.face=d6(); });
+    if(tick>9){
+      clearInterval(spin);
+      faces.forEach((f,i)=>{ setTimeout(()=>{
+        f.dataset.face=draft[i].face; f.classList.add("shake");
+        if(i===draft.length-1){ state.draw=draft; renderSlots(); renderCount(); syncBtns(); rolling=false; }
+      }, i*130); });
+    }
+  },70);
+  syncBtns();
+}
+
+function reroll(){
+  if(state.locked) return;
+  state.draw=null; state.picked=[];
+  roll();
+}
+
+/* SECTION: lock result */
+function lock(){
+  if(state.picked.length!==MAX_PICK) return;
+  state.locked=true;
+  const picks=state.picked.slice().sort((a,b)=>a-b).map(i=>state.draw[i]);
+  const box=$("resultBox"); box.classList.remove("hidden");
+  $("resultSub").textContent="回合 "+state.round+" · "+CLASSES[state.cls].name+" · 已锁定";
+  const holder=$("chosen"); holder.textContent="";
+  picks.forEach((d,idx)=>{
+    const el=$("tplChip").content.firstElementChild.cloneNode(true);
+    el.style.setProperty("--accent", d.kind==="专职" ? CLASSES[state.cls].accent : "var(--gold-soft)");
+    el.querySelector(".die") ;
+    el.querySelector(".no").textContent="意图 "+(idx+1);
+    el.querySelector(".n").textContent=d.item.name;
+    el.querySelector(".t").textContent=d.kind+" · 点数 "+d.face;
+    el.querySelector(".vd").textContent=d.item.desc;
+    el.querySelector(".vc").textContent=d.item.check;
+    el.querySelector(".ve2").textContent=d.item.effect;
+    const comb=el.querySelector(".comb");
+    comb.textContent=(d.item.note?("备注 · "+d.item.note+"　"):"")+"判定骰 · 1d100 "+d6()+"　效果骰 · "+d6()+d6()+d6();
+    holder.appendChild(el);
+  });
+  state.log.unshift({round:state.round,cls:CLASSES[state.cls].name,
+    names:picks.map(d=>d.item.name+"("+d.kind+d.face+")").join(" ＋ ")});
+  renderLog(); renderSlots(); renderCount(); syncBtns();
+  box.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function nextRound(){
+  state.round++; state.draw=null; state.picked=[]; state.locked=false;
+  $("roundNo").textContent=state.round;
+  $("resultBox").classList.add("hidden");
+  renderSlots(); renderCount(); syncBtns();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function adjust(){
+  state.locked=false; state.log.shift();
+  $("resultBox").classList.add("hidden");
+  renderSlots(); renderCount(); syncBtns(); renderLog();
+}
+
+/* SECTION: log render */
+function renderLog(){
+  const box=$("log"); box.textContent="";
+  if(!state.log.length){
+    const d=document.createElement("div"); d.className="empty";
+    d.textContent="本局尚无已锁定的回合。"; box.appendChild(d); return;
+  }
+  state.log.forEach(e=>{
+    const row=document.createElement("div"); row.className="item";
+    const r=document.createElement("span"); r.className="r"; r.textContent="R"+e.round;
+    const c=document.createElement("span"); c.className="a"; c.textContent=e.cls;
+    const v=document.createElement("span"); v.className="v"; v.textContent=e.names;
+    row.append(r,c,v); box.appendChild(row);
+  });
+}
+
+/* SECTION: table viewer */
+function renderTable(){
+  const body=$("tvBody"); body.textContent="";
+  $("tvTitle").textContent=CLASSES[state.cls].name+" · 意图总表";
+  const sections=[["专职意图栏（"+CLASSES[state.cls].name+"）",CLASSES[state.cls].list],["通用意图栏",COMMON]];
+  sections.forEach(([title,list])=>{
+    const wrap=document.createElement("div"); wrap.className="tvwrap";
+    wrap.style.setProperty("--accent",CLASSES[state.cls].accent);
+    const cap=document.createElement("p"); cap.className="tvcap"; cap.textContent=title;
+    const tb=document.createElement("table"); tb.className="tv";
+    const head=document.createElement("tr");
+    ["点数","意图","描述","判定","效果","备注"].forEach(h=>{
+      const th=document.createElement("th"); th.textContent=h; head.appendChild(th);
+    });
+    const thead=document.createElement("thead"); thead.appendChild(head); tb.appendChild(thead);
+    const tbody=document.createElement("tbody");
+    list.forEach(it=>{
+      const tr=document.createElement("tr");
+      [[ "p",String(it.p)],["n",it.name],["",it.desc],["",it.check],["",it.effect],["",it.note||"—"]]
+        .forEach(([cls,val])=>{ const td=document.createElement("td"); if(cls)td.className=cls; td.textContent=val; tr.appendChild(td); });
+      tbody.appendChild(tr);
+    });
+    tb.appendChild(tbody); wrap.append(cap,tb); body.appendChild(wrap);
+  });
+}
+
+/* SECTION: recharge modal */
+const PACKS=[
+  {amt:"60",price:"¥6",bonus:""},
+  {amt:"300",price:"¥30",bonus:"送 30"},
+  {amt:"680",price:"¥68",bonus:"送 100"},
+  {amt:"1280",price:"¥128",bonus:"送 280 · 最划算"}
+];
+let selectedPack=null;
+function renderPacks(){
+  const box=$("packs"); box.textContent="";
+  PACKS.forEach((p,i)=>{
+    const b=document.createElement("button"); b.type="button"; b.className="pack"+(i===PACKS.length-1?" best":"");
+    const a=document.createElement("div"); a.className="amt"; a.textContent=p.amt+" 积分";
+    const bo=document.createElement("div"); bo.className="bonus"; bo.textContent=p.bonus||"标准档";
+    const pr=document.createElement("div"); pr.className="price"; pr.textContent=p.price;
+    b.append(a,bo,pr);
+    b.addEventListener("click",()=>{
+      selectedPack=p; [...box.children].forEach(c=>c.style.outline="");
+      b.style.outline="2px solid var(--gold)";
+    });
+    box.appendChild(b);
+  });
+}
+document.addEventListener("click",e=>{
+  const pay=e.target.closest("[data-pay]");
+  if(pay){ toast("演示界面 · "+pay.dataset.pay+" 未接入真实支付"); return; }
+  const cl=e.target.closest("[data-close]");
+  if(cl){ $(cl.dataset.close).classList.remove("show"); }
+});
+[$("maskRecharge"),$("maskTable")].forEach(m=>{
+  m.addEventListener("click",e=>{ if(e.target===m) m.classList.remove("show"); });
+});
+
+/* SECTION: events */
+$("btnRoll").addEventListener("click",roll);
+$("btnReroll").addEventListener("click",reroll);
+$("btnLock").addEventListener("click",lock);
+$("btnNext").addEventListener("click",nextRound);
+$("btnAdjust").addEventListener("click",adjust);
+$("btnSwitch").addEventListener("click",backToSelect);
+$("btnRecharge").addEventListener("click",()=>$("maskRecharge").classList.add("show"));
+$("btnTable").addEventListener("click",()=>{
+  if(!state.cls){ toast("请先选择职业"); return; }
+  renderTable(); $("maskTable").classList.add("show");
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ $("maskRecharge").classList.remove("show"); $("maskTable").classList.remove("show"); }
+  if($("screenBattle").classList.contains("hidden")) return;
+  if(e.key===" "&&!state.locked&&!rolling){ e.preventDefault(); roll(); }
+  if(["1","2","3","4"].includes(e.key)&&state.draw&&!state.locked) togglePick(Number(e.key)-1);
+  if(e.key==="Enter"&&state.draw&&!state.locked&&state.picked.length===MAX_PICK) lock();
+});
+
+/* SECTION: init */
+renderClassCards(); renderPacks();
+try{
+  const saved=localStorage.getItem("coc_intent_class");
+  if(saved&&CLASSES[saved]) $("idQuote").dataset.saved=saved;
+}catch(e){}
+</script>
+</body>
+</html>
